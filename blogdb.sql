@@ -1,8 +1,165 @@
+-- PostgreSQL database dump
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET default_tablespace = '';
+SET default_with_oids = false;
+
+--- drop tables
+
+DROP TABLE IF EXISTS Likes;
+DROP TABLE IF EXISTS Followers;
+DROP TABLE IF EXISTS Post_Tags;
+DROP TABLE IF EXISTS Comments;
+DROP TABLE IF EXISTS Posts;
+DROP TABLE IF EXISTS Tags;
+DROP TABLE IF EXISTS Categories;
+DROP TABLE IF EXISTS Users;
+DROP TABLE IF EXISTS Roles;
+
+-- Name: Roles; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Roles (
+    role_id serial primary key,
+    role_name varchar(255) unique not null
+);
+
+-- Name: Categories; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Categories (
+    category_id serial primary key,
+    category varchar(255) unique not null,
+    post_count integer default 0
+);
+
+-- Name: Tags; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Tags (
+    tag_id serial primary key,
+    tag_name varchar(255) unique not null
+);
+
+-- Name: Users; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Users (
+    user_id serial primary key not null,
+    role_id integer not null references Roles(role_id),
+    email varchar(255) unique not null,
+    username varchar(255) not null,
+    birthdate date,
+    password varchar(255) not null
+);
+
+-- Name: Posts; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Posts (
+    post_id serial primary key,
+    user_id integer not null references Users(user_id) on delete cascade,
+    category_id integer references Categories(category_id) on delete set null,
+    title text not null,
+    content text not null,
+    created_at timestamp default current_timestamp,
+    likes_count integer default 0
+);
+
+-- Name: Comments; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Comments (
+    comment_id serial primary key,
+    post_id integer not null references Posts(post_id) on delete cascade,
+    user_id integer not null references Users(user_id) on delete cascade,
+    content text not null,
+    created_at timestamp default current_timestamp,
+    likes_count integer default 0
+);
+
+-- Name: Post_Tags; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Post_Tags (
+    tag_id integer not null references Tags(tag_id) on delete cascade,
+    post_id integer not null references Posts(post_id) on delete cascade,
+    primary key (post_id, tag_id)
+);
+
+-- Name: Followers; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Followers (
+    follower_id integer not null references Users(user_id) on delete cascade,
+    followed_id integer not null references Users(user_id) on delete cascade,
+    check (followed_id != follower_id),
+    primary key (follower_id, followed_id)
+);
+
+-- Name: Likes; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+
+CREATE TABLE Likes (
+    like_id serial primary key,
+    post_id integer not null references Posts(post_id) on delete cascade,
+    user_id integer not null references Users(user_id) on delete cascade,
+    created_at timestamp default current_timestamp,
+    unique(post_id, user_id)
+);
+
+CREATE INDEX idx_posts_user_id ON Posts(user_id);
+CREATE INDEX idx_posts_category_id ON Posts(category_id);
+CREATE INDEX idx_comments_post_id ON Comments(post_id);
+CREATE INDEX idx_comments_user_id ON Comments(user_id);
+CREATE INDEX idx_post_tags_tag_id ON Post_Tags(tag_id);
+CREATE INDEX idx_followers_follower_id ON Followers(follower_id);
+
+COMMENT ON TABLE Roles IS 'User roles for access control (Admin, Moderator, User)';
+COMMENT ON TABLE Users IS 'User accounts with email, username, and assigned roles';
+COMMENT ON TABLE Categories IS 'Blog post categories with auto-updated post count via trigger';
+COMMENT ON TABLE Tags IS 'Tags for categorizing and organizing posts';
+COMMENT ON TABLE Posts IS 'Blog posts with content, timestamps, and like counts';
+COMMENT ON COLUMN Posts.likes_count IS 'Denormalized count; actual likes tracked in Likes table';
+COMMENT ON TABLE Comments IS 'Comments on posts with user attribution and engagement metrics';
+COMMENT ON TABLE Post_Tags IS 'Junction table linking posts to multiple tags (many-to-many)';
+COMMENT ON TABLE Likes IS 'Tracks individual user likes on posts with timestamps';
+COMMENT ON TABLE Followers IS 'User-to-user follow relationships for social features';
+COMMENT ON COLUMN Users.role_id IS 'References user role for permission management';
+
+
+-- TRIGGER FOR AUTO-UPDATING POST COUNT 
+CREATE OR REPLACE FUNCTION update_post_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE Categories SET post_count = post_count + 1 WHERE category_id = NEW.category_id;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE Categories SET post_count = post_count - 1 WHERE category_id = OLD.category_id;
+    RETURN OLD;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF NEW.category_id != OLD.category_id THEN
+      UPDATE Categories SET post_count = post_count - 1 WHERE category_id = OLD.category_id;
+      UPDATE Categories SET post_count = post_count + 1 WHERE category_id = NEW.category_id;
+    END IF;
+    RETURN NEW;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER post_count_trigger
+AFTER INSERT OR DELETE OR UPDATE ON Posts
+FOR EACH ROW
+EXECUTE FUNCTION update_post_count();
+
+-- Inserting data to our database
 -- Data has been generated using Artificial Intelligence
+
+-- Data for Name: Roles; Type: TABLE DATA; Schema: public; Owner: -
+
 INSERT INTO Roles (role_name) VALUES
 ('Admin'),
 ('Moderator'),
 ('User');
+
+-- Data for Name: Users; Type: TABLE DATA; Schema: public; Owner: -
 
 INSERT INTO Users (role_id, email, username, birthdate, password) VALUES
 (1, 'admin@blog.com', 'admin_user', '1990-05-15', 'hashed_password_1'),
@@ -16,6 +173,8 @@ INSERT INTO Users (role_id, email, username, birthdate, password) VALUES
 (3, 'alex@blog.com', 'alex_gamer', '1999-01-25', 'hashed_password_9'),
 (3, 'chris@blog.com', 'chris_blogger', '1991-12-08', 'hashed_password_10');
 
+-- Data for Name: Categories; Type: TABLE DATA; Schema: public; Owner: -
+
 INSERT INTO Categories (category, post_count) VALUES
 ('Technology', 0),
 ('Travel', 0),
@@ -23,6 +182,8 @@ INSERT INTO Categories (category, post_count) VALUES
 ('Lifestyle', 0),
 ('Business', 0),
 ('Gaming', 0);
+
+-- Data for Name: Tags; Type: TABLE DATA; Schema: public; Owner: -
 
 INSERT INTO Tags (tag_name) VALUES
 ('tutorial'),
@@ -42,7 +203,14 @@ INSERT INTO Tags (tag_name) VALUES
 ('health'),
 ('fitness');
 
+-- Data for Name: Posts; Type: TABLE DATA; Schema: public; Owner: -
+
 INSERT INTO Posts (user_id, category_id, title, content, created_at, likes_count) VALUES
+(1, 1, 'Welcome to Our Blog Platform', 'Excited to announce the launch of our new blog platform! This is a modern, scalable solution built with PostgreSQL...', '2025-01-16 08:00:00', 234),
+(1, 5, 'Platform Updates and Roadmap', 'Here''s what we''re planning for the next quarter. We''re focusing on performance, user experience, and new features...', '2025-01-14 12:30:00', 156),
+(1, 1, 'Database Best Practices for Developers', 'As the admin, I wanted to share some essential database practices we use on this platform. Normalization, indexing, and more...', '2025-01-10 15:45:00', 189),
+(2, 5, 'Community Guidelines and Moderation', 'Important rules for maintaining a healthy community. We''re committed to providing a safe and respectful space for all users...', '2025-01-15 10:20:00', 98),
+(2, 1, 'New Feature: Post Tagging System', 'We''ve just rolled out our new tagging system! This makes it easier to organize and discover content across our blog...', '2025-01-12 14:00:00', 167),
 (3, 1, 'Getting Started with PostgreSQL', 'PostgreSQL is a powerful open-source relational database. In this tutorial, we will explore the basics...', '2025-01-15 10:30:00', 45),
 (5, 1, 'JavaScript ES6 Features Explained', 'ES6 brought many new features to JavaScript. Let''s dive into arrow functions, promises, and async/await...', '2025-01-14 14:20:00', 78),
 (6, 2, 'My Amazing Trip to Tokyo', 'Just returned from an incredible journey through Tokyo. The temples, food, and culture are amazing...', '2025-01-13 09:15:00', 125),
@@ -71,6 +239,8 @@ INSERT INTO Posts (user_id, category_id, title, content, created_at, likes_count
 (4, 1, 'TypeScript Advanced Types', 'Deep dive into TypeScript generics, mapped types, and conditional types...', '2024-12-21 14:20:00', 143),
 (5, 4, 'Building Passive Income Streams', 'Different ways to build passive income. From blogging to digital products...', '2024-12-20 10:00:00', 176);
 
+
+-- Data for Name: Comments; Type: TABLE DATA; Schema: public; Owner: -
 
 INSERT INTO Comments (post_id, user_id, content, created_at, likes_count) VALUES
 (1, 5, 'Great tutorial! Really helpful for beginners.', '2025-01-15 11:20:00', 8),
@@ -118,6 +288,8 @@ INSERT INTO Comments (post_id, user_id, content, created_at, likes_count) VALUES
 (25, 3, 'Iceland is on my bucket list now!', '2024-12-22 09:00:00', 14),
 (25, 6, 'Your photos are inspiring. Great storytelling!', '2024-12-22 10:15:00', 11);
 
+-- Data for Name: Post_Tags; Type: TABLE DATA; Schema: public; Owner: -
+
 INSERT INTO Post_Tags (post_id, tag_id) VALUES
 (1, 1), (1, 2), (1, 13),
 (2, 1), (2, 9), (2, 10),
@@ -145,6 +317,8 @@ INSERT INTO Post_Tags (post_id, tag_id) VALUES
 (24, 1), (24, 9), (24, 4),
 (25, 7), (25, 6), (25, 5),
 (26, 1), (26, 3), (26, 10);
+
+-- Data for Name: Likes; Type: TABLE DATA; Schema: public; Owner: -
 
 INSERT INTO Likes (post_id, user_id, created_at) VALUES
 (1, 3, '2025-01-15 10:45:00'),
@@ -239,6 +413,8 @@ INSERT INTO Likes (post_id, user_id, created_at) VALUES
 (26, 3, '2024-12-21 14:30:00'),
 (26, 4, '2024-12-21 15:00:00'),
 (26, 5, '2024-12-21 15:15:00');
+
+-- Data for Name: Followers; Type: TABLE DATA; Schema: public; Owner: -
 
 INSERT INTO Followers (follower_id, followed_id) VALUES
 (3, 5), (3, 6), (3, 7),
