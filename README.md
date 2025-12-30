@@ -17,6 +17,7 @@ Simple sql script to create and populate blog database.
 ````bash
 psql -U postgres
 ````
+or use your sql shell.
 
 **Via pgAdmin 4 GUI:**
 
@@ -69,6 +70,25 @@ Run the script into your database:
 2. Select `blogdb.sql` from your file system
 3. The script content will load in the editor
 4. Click the "Execute" button or press `F5`
+
+## Practice Queries
+
+Now that you've successfully installed the database, practice your SQL skills with these queries sorted from basic to advanced:
+1. Retrieve all data from the Users table
+2. Display all categories in the database
+3. Show all posts with their titles and creation dates
+4. Find all users with a specific role (e.g., admin with role = 1)
+5. Count the total number of posts in the database
+6. Display all posts with more than 100 likes
+7. Show username and email of users who have posted content
+8. Find the average number of likes per post in each category
+9. Display all posts with their category names and author usernames
+10. List users with the number of posts they've created (only users with posts)
+11. Find the most followed user and retrieve their data
+12. Display the most popular posts from each category (highest likes per category)
+13. Find users who have both posted and commented on other users' posts
+14. Get the top 5 users by total engagement (combined likes on their posts and comments)
+15. Find posts with comments from users who also follow the post author
 
 ## Contributions
 
