@@ -1,0 +1,21 @@
+like_id,post_id,post_title,post_author_id,post_author_username,user_id,liker_username,liker_email,created_at
+1,1,Getting Started with Python,1,john_doe,2,jane_smith,jane@example.com,2025-12-01 11:30:00
+2,1,Getting Started with Python,1,john_doe,3,bob_wilson,bob@example.com,2025-12-01 12:00:00
+3,1,Getting Started with Python,1,john_doe,5,michael_brown,michael@example.com,2025-12-01 12:30:00
+4,1,Getting Started with Python,1,john_doe,6,sarah_davis,sarah@example.com,2025-12-01 13:00:00
+5,1,Getting Started with Python,1,john_doe,7,david_miller,david@example.com,2025-12-01 13:30:00
+6,2,Morning Routine Tips,2,jane_smith,1,john_doe,john@example.com,2025-12-02 08:45:00
+7,2,Morning Routine Tips,2,jane_smith,3,bob_wilson,bob@example.com,2025-12-02 09:15:00
+8,2,Morning Routine Tips,2,jane_smith,4,alice_jones,alice@example.com,2025-12-02 09:45:00
+9,3,Web Development Best Practices,1,john_doe,2,jane_smith,jane@example.com,2025-12-03 15:00:00
+10,3,Web Development Best Practices,1,john_doe,4,alice_jones,alice@example.com,2025-12-03 15:30:00
+11,3,Web Development Best Practices,1,john_doe,5,michael_brown,michael@example.com,2025-12-03 16:00:00
+12,4,Exploring Tokyo,3,bob_wilson,1,john_doe,john@example.com,2025-12-04 12:30:00
+13,4,Exploring Tokyo,3,bob_wilson,2,jane_smith,jane@example.com,2025-12-04 13:00:00
+14,4,Exploring Tokyo,3,bob_wilson,6,sarah_davis,sarah@example.com,2025-12-04 13:30:00
+15,4,Exploring Tokyo,3,bob_wilson,8,emma_wilson,emma@example.com,2025-12-04 14:00:00
+16,5,Healthy Eating Guide,2,jane_smith,1,john_doe,john@example.com,2025-12-05 09:30:00
+17,5,Healthy Eating Guide,2,jane_smith,3,bob_wilson,bob@example.com,2025-12-05 10:00:00
+18,5,Healthy Eating Guide,2,jane_smith,9,james_taylor,james@example.com,2025-12-05 10:30:00
+19,6,Introduction to Machine Learning,1,john_doe,2,jane_smith,jane@example.com,2025-12-06 17:00:00
+20,6,Introduction to Machine Learning,1,john_doe,5,michael_brown,michael@example.com,2025-12-06 17:30:00

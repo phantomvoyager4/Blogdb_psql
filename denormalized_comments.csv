@@ -1,0 +1,11 @@
+comment_id,post_id,post_title,user_id,commenter_username,commenter_email,content,created_at,likes_count
+1,1,Getting Started with Python,5,michael_brown,michael@example.com,Great introduction! I found this very helpful for beginners.,2025-12-01 11:05:00,3
+2,1,Getting Started with Python,6,sarah_davis,sarah@example.com,Could you elaborate more on list comprehensions?,2025-12-01 12:30:00,2
+3,2,Morning Routine Tips,7,david_miller,david@example.com,I tried these tips and they really work!,2025-12-02 09:45:00,8
+4,3,Web Development Best Practices,1,john_doe,john@example.com,Thanks for the feedback! I appreciate the insights.,2025-12-03 15:20:00,1
+5,3,Web Development Best Practices,5,michael_brown,michael@example.com,This aligns with my experience in production environments.,2025-12-03 16:10:00,4
+6,4,Exploring Tokyo,8,emma_wilson,emma@example.com,I've been to Tokyo twice. Totally agree with your observations!,2025-12-04 12:00:00,6
+7,5,Healthy Eating Guide,9,james_taylor,james@example.com,Do you have any recommendations for meal prep?,2025-12-05 10:30:00,2
+8,6,Introduction to Machine Learning,10,oliver_anderson,oliver@example.com,Looking forward to your next post on neural networks!,2025-12-06 17:15:00,5
+9,7,Startup Success Stories,5,michael_brown,michael@example.com,Insightful article. The section on funding was particularly useful.,2025-12-07 14:45:00,4
+10,9,Mental Health Awareness,11,lisa_garcia,lisa@example.com,Thank you for raising awareness on this important topic.,2025-12-09 13:50:00,12
