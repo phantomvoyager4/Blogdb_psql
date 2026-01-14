@@ -51,7 +51,11 @@ CREATE TABLE Users (
     email varchar(255) unique not null,
     username varchar(255) not null,
     birthdate date,
-    password varchar(255) not null
+    password varchar(255) not null,
+    created_at timestamp default current_timestamp,
+    check (char_length(email) > 5),
+    check (char_length(username) >= 3 and char_length(username) <= 50),
+    check (char_length(password) >= 8)
 );
 
 -- Name: Posts; Type: TABLE; Schema: public; Owner: -; Tablespace: 
@@ -70,11 +74,20 @@ CREATE TABLE Posts (
 
 CREATE TABLE Comments (
     comment_id serial primary key,
+    parent_comment_id integer references Comments(comment_id) on delete cascade,
     post_id integer not null references Posts(post_id) on delete cascade,
     user_id integer not null references Users(user_id) on delete cascade,
     content text not null,
     created_at timestamp default current_timestamp,
     likes_count integer default 0
+);
+
+CREATE TABLE Comment_Likes (
+    like_id SERIAL PRIMARY KEY,
+    comment_id INTEGER NOT NULL REFERENCES Comments(comment_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES Users(user_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(comment_id, user_id)
 );
 
 -- Name: Post_Tags; Type: TABLE; Schema: public; Owner: -; Tablespace: 
@@ -108,20 +121,34 @@ CREATE INDEX idx_posts_user_id ON Posts(user_id);
 CREATE INDEX idx_posts_category_id ON Posts(category_id);
 CREATE INDEX idx_comments_post_id ON Comments(post_id);
 CREATE INDEX idx_comments_user_id ON Comments(user_id);
+CREATE INDEX idx_comments_parent_id ON Comments(parent_comment_id);
 CREATE INDEX idx_post_tags_tag_id ON Post_Tags(tag_id);
+CREATE INDEX idx_post_tags_post_id ON Post_Tags(post_id);
 CREATE INDEX idx_followers_follower_id ON Followers(follower_id);
+CREATE INDEX idx_followers_followed_id ON Followers(followed_id);
+CREATE INDEX idx_likes_post_id ON Likes(post_id);
+CREATE INDEX idx_likes_user_id ON Likes(user_id);
+CREATE INDEX idx_comment_likes_comment_id ON Comment_Likes(comment_id);
+CREATE INDEX idx_comment_likes_user_id ON Comment_Likes(user_id);
 
 COMMENT ON TABLE Roles IS 'User roles for access control (Admin, Moderator, User)';
-COMMENT ON TABLE Users IS 'User accounts with email, username, and assigned roles';
+COMMENT ON TABLE Users IS 'User accounts with email, username, and assigned roles with validation constraints';
+COMMENT ON COLUMN Users.created_at IS 'Account creation timestamp';
+COMMENT ON COLUMN Users.email IS 'User email (must be at least 6 characters)';
+COMMENT ON COLUMN Users.username IS 'User display name (3-50 characters)';
+COMMENT ON COLUMN Users.password IS 'Hashed password (minimum 8 characters)';
+COMMENT ON COLUMN Users.role_id IS 'References user role for permission management';
 COMMENT ON TABLE Categories IS 'Blog post categories with auto-updated post count via trigger';
 COMMENT ON TABLE Tags IS 'Tags for categorizing and organizing posts';
 COMMENT ON TABLE Posts IS 'Blog posts with content, timestamps, and like counts';
 COMMENT ON COLUMN Posts.likes_count IS 'Denormalized count; actual likes tracked in Likes table';
-COMMENT ON TABLE Comments IS 'Comments on posts with user attribution and engagement metrics';
+COMMENT ON TABLE Comments IS 'Comments on posts with support for nested replies (parent_comment_id). Likes tracked in Comment_Likes table';
+COMMENT ON COLUMN Comments.parent_comment_id IS 'References parent comment for nested replies; NULL if top-level comment';
+COMMENT ON COLUMN Comments.likes_count IS 'Denormalized count; actual likes tracked in Comment_Likes table';
+COMMENT ON TABLE Comment_Likes IS 'Tracks individual user likes on comments with timestamps';
 COMMENT ON TABLE Post_Tags IS 'Junction table linking posts to multiple tags (many-to-many)';
 COMMENT ON TABLE Likes IS 'Tracks individual user likes on posts with timestamps';
 COMMENT ON TABLE Followers IS 'User-to-user follow relationships for social features';
-COMMENT ON COLUMN Users.role_id IS 'References user role for permission management';
 
 
 -- TRIGGER FOR AUTO-UPDATING POST COUNT 
@@ -148,6 +175,44 @@ CREATE TRIGGER post_count_trigger
 AFTER INSERT OR DELETE OR UPDATE ON Posts
 FOR EACH ROW
 EXECUTE FUNCTION update_post_count();
+
+-- TRIGGER FOR AUTO-UPDATING COMMENT LIKE COUNT
+CREATE OR REPLACE FUNCTION update_comment_like_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE Comments SET likes_count = likes_count + 1 WHERE comment_id = NEW.comment_id;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE Comments SET likes_count = likes_count - 1 WHERE comment_id = OLD.comment_id;
+    RETURN OLD;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER comment_like_count_trigger
+AFTER INSERT OR DELETE ON Comment_Likes
+FOR EACH ROW
+EXECUTE FUNCTION update_comment_like_count();
+
+-- TRIGGER FOR AUTO-UPDATING POST LIKE COUNT
+CREATE OR REPLACE FUNCTION update_post_like_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE Posts SET likes_count = likes_count + 1 WHERE post_id = NEW.post_id;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE Posts SET likes_count = likes_count - 1 WHERE post_id = OLD.post_id;
+    RETURN OLD;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER post_like_count_trigger
+AFTER INSERT OR DELETE ON Likes
+FOR EACH ROW
+EXECUTE FUNCTION update_post_like_count();
 
 -- Inserting data to our database
 -- Data has been generated using Artificial Intelligence
@@ -241,52 +306,89 @@ INSERT INTO Posts (user_id, category_id, title, content, created_at, likes_count
 
 
 -- Data for Name: Comments; Type: TABLE DATA; Schema: public; Owner: -
+-- Note: parent_comment_id is NULL for top-level comments, references another comment_id for replies
 
-INSERT INTO Comments (post_id, user_id, content, created_at, likes_count) VALUES
-(1, 5, 'Great tutorial! Really helpful for beginners.', '2025-01-15 11:20:00', 8),
-(1, 7, 'Could you explain transactions more? Great post though!', '2025-01-15 13:00:00', 5),
-(2, 3, 'ES6 is amazing. This was a perfect explanation!', '2025-01-14 15:10:00', 12),
-(2, 6, 'I still struggle with async/await, need more examples.', '2025-01-14 16:45:00', 3),
-(3, 4, 'Tokyo is beautiful! Love the photos you shared.', '2025-01-13 10:30:00', 15),
-(3, 10, 'Planning my own trip there, this is so helpful!', '2025-01-13 12:00:00', 9),
-(4, 5, 'Making this tonight! Looks delicious.', '2025-01-12 19:20:00', 7),
-(4, 9, 'Any vegetarian versions?', '2025-01-12 20:00:00', 2),
-(5, 3, 'Excellent guide for building APIs. Will follow this!', '2025-01-11 12:10:00', 18),
-(5, 8, 'What about authentication? Would love to see that.', '2025-01-11 14:30:00', 6),
-(6, 7, 'Agreed! 2024 had amazing games.', '2025-01-10 17:45:00', 11),
-(6, 4, 'Where''s Elden Ring 2? That should be #1!', '2025-01-10 18:20:00', 8),
-(7, 3, 'This changed my mornings. Thanks!', '2025-01-09 08:15:00', 14),
-(7, 6, 'Trying this tomorrow, fingers crossed!', '2025-01-09 09:00:00', 4),
-(8, 4, 'Normalization is so important. Great breakdown!', '2025-01-08 14:40:00', 10),
-(9, 5, 'Saving this for my Paris trip next month!', '2025-01-07 11:30:00', 12),
-(10, 3, 'Starting my startup next year, this is gold!', '2025-01-06 16:20:00', 9),
-(11, 7, 'These recipes are game-changing!', '2025-01-05 13:10:00', 11),
-(12, 6, 'Finally understanding ML concepts. Thank you!', '2025-01-04 15:30:00', 16),
-(13, 5, 'Minimalism resonates with me. Great post!', '2025-01-03 09:45:00', 7),
-(14, 3, 'Hooks are so much better than class components!', '2025-01-02 12:20:00', 9),
-(14, 7, 'Can you do a video tutorial on this?', '2025-01-02 13:00:00', 4),
-(15, 4, 'Budget travel is the best way to explore!', '2025-01-01 09:45:00', 13),
-(15, 5, 'These tips saved me so much money!', '2025-01-01 10:30:00', 8),
-(16, 3, 'Web scraping is so powerful. Nice tutorial!', '2024-12-31 10:45:00', 10),
-(16, 6, 'Ethics matter. Good job emphasizing responsible scraping.', '2024-12-31 11:30:00', 7),
-(17, 5, 'This is exactly what I needed for my business!', '2024-12-30 14:30:00', 12),
-(17, 9, 'Do you have recommendations for caching strategies?', '2024-12-30 15:15:00', 5),
-(18, 4, 'Finally a perfect recipe! Made these yesterday.', '2024-12-29 17:20:00', 11),
-(18, 8, 'Brown butter is the secret ingredient!', '2024-12-29 18:00:00', 6),
-(19, 3, 'Docker simplified everything for our team.', '2024-12-28 12:00:00', 14),
-(19, 7, 'Great explanation of images vs containers!', '2024-12-28 13:15:00', 8),
-(20, 4, 'Booking my trip based on your suggestions!', '2024-12-27 09:50:00', 16),
-(20, 6, 'The photography is absolutely stunning.', '2024-12-27 10:30:00', 10),
-(21, 3, 'This resonates deeply. Burnout is real in tech.', '2024-12-26 13:30:00', 13),
-(21, 8, 'What specific strategies have helped you most?', '2024-12-26 14:15:00', 6),
-(22, 5, 'Adding these to my wishlist right now!', '2024-12-25 16:00:00', 11),
-(22, 7, 'Stardew Valley should be on this list!', '2024-12-25 16:45:00', 9),
-(23, 4, 'Plant-based cooking is easier than I thought!', '2024-12-24 11:15:00', 9),
-(23, 6, 'Do you have a nutrition guide to go with these?', '2024-12-24 12:00:00', 4),
-(24, 5, 'Finally understanding rebase vs merge!', '2024-12-23 12:45:00', 15),
-(24, 7, 'Every developer should read this.', '2024-12-23 13:30:00', 10),
-(25, 3, 'Iceland is on my bucket list now!', '2024-12-22 09:00:00', 14),
-(25, 6, 'Your photos are inspiring. Great storytelling!', '2024-12-22 10:15:00', 11);
+INSERT INTO Comments (post_id, user_id, content, created_at, likes_count, parent_comment_id) VALUES
+(1, 5, 'Great tutorial! Really helpful for beginners.', '2025-01-15 11:20:00', 2, NULL),
+(1, 7, 'Could you explain transactions more? Great post though!', '2025-01-15 13:00:00', 1, NULL),
+(2, 3, 'ES6 is amazing. This was a perfect explanation!', '2025-01-14 15:10:00', 12, NULL),
+(2, 6, 'I still struggle with async/await, need more examples.', '2025-01-14 16:45:00', 3, NULL),
+(3, 4, 'Tokyo is beautiful! Love the photos you shared.', '2025-01-13 10:30:00', 15, NULL),
+(3, 10, 'Planning my own trip there, this is so helpful!', '2025-01-13 12:00:00', 9, NULL),
+(4, 5, 'Making this tonight! Looks delicious.', '2025-01-12 19:20:00', 7, NULL),
+(4, 9, 'Any vegetarian versions?', '2025-01-12 20:00:00', 2, NULL),
+(5, 3, 'Excellent guide for building APIs. Will follow this!', '2025-01-11 12:10:00', 18, NULL),
+(5, 8, 'What about authentication? Would love to see that.', '2025-01-11 14:30:00', 6, NULL),
+(6, 7, 'Agreed! 2024 had amazing games.', '2025-01-10 17:45:00', 11, NULL),
+(6, 4, 'Where''s Elden Ring 2? That should be #1!', '2025-01-10 18:20:00', 8, NULL),
+(7, 3, 'This changed my mornings. Thanks!', '2025-01-09 08:15:00', 14, NULL),
+(7, 6, 'Trying this tomorrow, fingers crossed!', '2025-01-09 09:00:00', 4, NULL),
+(8, 4, 'Normalization is so important. Great breakdown!', '2025-01-08 14:40:00', 10, NULL),
+(9, 5, 'Saving this for my Paris trip next month!', '2025-01-07 11:30:00', 12, NULL),
+(10, 3, 'Starting my startup next year, this is gold!', '2025-01-06 16:20:00', 9, NULL),
+(11, 7, 'These recipes are game-changing!', '2025-01-05 13:10:00', 11, NULL),
+(12, 6, 'Finally understanding ML concepts. Thank you!', '2025-01-04 15:30:00', 16, NULL),
+(13, 5, 'Minimalism resonates with me. Great post!', '2025-01-03 09:45:00', 7, NULL),
+(14, 3, 'Hooks are so much better than class components!', '2025-01-02 12:20:00', 9, NULL),
+(14, 7, 'Can you do a video tutorial on this?', '2025-01-02 13:00:00', 4, NULL),
+(15, 4, 'Budget travel is the best way to explore!', '2025-01-01 09:45:00', 13, NULL),
+(15, 5, 'These tips saved me so much money!', '2025-01-01 10:30:00', 8, NULL),
+(16, 3, 'Web scraping is so powerful. Nice tutorial!', '2024-12-31 10:45:00', 10, NULL),
+(16, 6, 'Ethics matter. Good job emphasizing responsible scraping.', '2024-12-31 11:30:00', 7, NULL),
+(17, 5, 'This is exactly what I needed for my business!', '2024-12-30 14:30:00', 12, NULL),
+(17, 9, 'Do you have recommendations for caching strategies?', '2024-12-30 15:15:00', 5, NULL),
+(18, 4, 'Finally a perfect recipe! Made these yesterday.', '2024-12-29 17:20:00', 11, NULL),
+(18, 8, 'Brown butter is the secret ingredient!', '2024-12-29 18:00:00', 6, NULL),
+(19, 3, 'Docker simplified everything for our team.', '2024-12-28 12:00:00', 14, NULL),
+(19, 7, 'Great explanation of images vs containers!', '2024-12-28 13:15:00', 8, NULL),
+(20, 4, 'Booking my trip based on your suggestions!', '2024-12-27 09:50:00', 16, NULL),
+(20, 6, 'The photography is absolutely stunning.', '2024-12-27 10:30:00', 10, NULL),
+(21, 3, 'This resonates deeply. Burnout is real in tech.', '2024-12-26 13:30:00', 13, NULL),
+(21, 8, 'What specific strategies have helped you most?', '2024-12-26 14:15:00', 6, NULL),
+(22, 5, 'Adding these to my wishlist right now!', '2024-12-25 16:00:00', 11, NULL),
+(22, 7, 'Stardew Valley should be on this list!', '2024-12-25 16:45:00', 9, NULL),
+(23, 4, 'Plant-based cooking is easier than I thought!', '2024-12-24 11:15:00', 9, NULL),
+(23, 6, 'Do you have a nutrition guide to go with these?', '2024-12-24 12:00:00', 4, NULL),
+(24, 5, 'Finally understanding rebase vs merge!', '2024-12-23 12:45:00', 15, NULL),
+(24, 7, 'Every developer should read this.', '2024-12-23 13:30:00', 10, NULL),
+(25, 3, 'Iceland is on my bucket list now!', '2024-12-22 09:00:00', 14, NULL),
+(25, 6, 'Your photos are inspiring. Great storytelling!', '2024-12-22 10:15:00', 11, NULL),
+(1, 3, 'I agree with the tutorial approach!', '2025-01-15 11:45:00', 2, 1),
+(1, 4, 'Great point about transactions!', '2025-01-15 13:30:00', 1, 2);
+
+-- Data for Name: Comment_Likes; Type: TABLE DATA; Schema: public; Owner: -
+
+INSERT INTO Comment_Likes (comment_id, user_id, created_at) VALUES
+(1, 3, '2025-01-15 11:30:00'),
+(1, 4, '2025-01-15 11:40:00'),
+(2, 5, '2025-01-15 13:15:00'),
+(3, 4, '2025-01-14 15:20:00'),
+(3, 7, '2025-01-14 15:35:00'),
+(4, 3, '2025-01-14 17:00:00'),
+(5, 6, '2025-01-13 10:45:00'),
+(6, 5, '2025-01-13 12:15:00'),
+(6, 7, '2025-01-13 12:30:00'),
+(7, 3, '2025-01-12 19:30:00'),
+(8, 5, '2025-01-12 20:15:00'),
+(9, 4, '2025-01-11 12:25:00'),
+(10, 5, '2025-01-11 14:45:00'),
+(11, 5, '2025-01-10 18:00:00'),
+(12, 3, '2025-01-10 18:30:00'),
+(13, 4, '2025-01-09 08:30:00'),
+(14, 5, '2025-01-09 09:15:00'),
+(15, 3, '2025-01-08 14:50:00'),
+(16, 5, '2025-01-07 11:45:00'),
+(17, 4, '2025-01-06 16:35:00'),
+(18, 5, '2025-01-05 13:25:00'),
+(19, 4, '2025-01-04 15:45:00'),
+(20, 4, '2025-01-03 10:00:00'),
+(21, 4, '2025-01-02 12:35:00'),
+(22, 3, '2025-01-02 13:15:00'),
+(23, 5, '2025-01-01 10:00:00'),
+(24, 5, '2024-12-23 13:00:00'),
+(25, 4, '2024-12-22 09:30:00'),
+(47, 5, '2025-01-15 12:00:00'),
+(48, 4, '2025-01-15 13:45:00');
 
 -- Data for Name: Post_Tags; Type: TABLE DATA; Schema: public; Owner: -
 
